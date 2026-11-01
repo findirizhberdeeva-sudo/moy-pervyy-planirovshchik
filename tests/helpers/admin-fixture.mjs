@@ -26,5 +26,5 @@ export function adminFixture(db,identityForToken,state={}) {
    },async updateUserById(id,attributes){state.bans.push({id,...attributes});return state.authBanFailure?{error:{message:'secret Auth diagnostic'}}:{data:{user:{id}}};}}
   }};
  };
- return {state,handler:createTeamAdminHandler({createClient,url:'https://ritm-test.supabase.co',publicKey:'fixture-public',serviceKey:'fixture-service',appUrl:'https://example.github.io/ritm/',allowedOrigins:['https://example.github.io','http://127.0.0.1:3000']})};
+ return {state,handler:createTeamAdminHandler({createClient,url:'https://ritm-test.supabase.co',publicKey:'fixture-public',serviceKey:'fixture-service',appUrl:'https://example.github.io/ritm/',allowedOrigins:['https://example.github.io','http://127.0.0.1:3000'],emailDeliveryEnabled:state.emailDeliveryEnabled??true})};
 }

@@ -1,0 +1,20 @@
+{
+  "name": "ritm-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "check": "node --check app.js",
+    "build": "node scripts/build-release.mjs",
+    "prepare:pages": "node scripts/build-release.mjs --pages"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.14",
+    "@playwright/test": "1.64.1",
+    "@supabase/supabase-js": "2.118.0",
+    "pptxgenjs": "4.0.1"
+  }
+}

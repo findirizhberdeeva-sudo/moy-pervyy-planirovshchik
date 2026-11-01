@@ -1,0 +1,9 @@
+node_modules/
+.cache/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+.supabase/
+dist/

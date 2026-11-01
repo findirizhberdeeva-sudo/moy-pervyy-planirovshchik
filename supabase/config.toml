@@ -15,7 +15,7 @@ minimum_password_length = 12
 enable_signup = false
 double_confirm_changes = true
 enable_confirmations = true
-secure_password_change = true
+secure_password_change = false # Current no-email mode; enable when SMTP is explicitly enabled.
 max_frequency = "60s"
 otp_expiry = 86400
 
@@ -33,7 +33,8 @@ content_path = "./supabase/templates/recovery.html"
 subject = "Приглашение в команду — Ритм"
 content_path = "./supabase/templates/invite.html"
 
-# SMTP credentials are intentionally absent. Use a managed SMTP provider;
+# Current deployment does not send email. SMTP credentials are intentionally absent;
+# use a managed SMTP provider only when email delivery is explicitly enabled.
 # never commit its password. The production Site URL must include the repo path.
 
 [functions.team-admin]

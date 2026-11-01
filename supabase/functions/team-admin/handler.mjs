@@ -2,7 +2,7 @@
 // Never import this server file into the three published frontend files.
 const actions=new Set(['invite_employee','resend_invitation','cancel_invitation','list_team_admin','disable_employee','enable_employee']);
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export function createTeamAdminHandler({createClient,url,publicKey,serviceKey,appUrl,allowedOrigins=[]}) {
+export function createTeamAdminHandler({createClient,url,publicKey,serviceKey,appUrl,allowedOrigins=[],emailDeliveryEnabled=true}) {
  const origins=new Set(allowedOrigins);
  const configured=(()=>{try{const redirect=new URL(appUrl);return !!url&&!!publicKey&&!!serviceKey&&origins.has(redirect.origin)&&!redirect.search&&!redirect.hash&&
   (redirect.protocol==='https:'||redirect.protocol==='http:'&&['127.0.0.1','localhost'].includes(redirect.hostname));}catch{return false;}})();
@@ -32,6 +32,7 @@ export function createTeamAdminHandler({createClient,url,publicKey,serviceKey,ap
    const {data:access,error:accessError}=await caller.rpc('authorize_team_admin',{p_team_id:input.team_id});
    if(accessError)return failure('NETWORK_OR_SERVICE_ERROR','Не удалось проверить роль. Повторите после восстановления связи.',503);
    if(!access?.ok||access.data.actor_id!==identity.user.id)return failure('ACCESS_DENIED','Доступ руководителя не подтверждён.',403);
+   if(!emailDeliveryEnabled&&['invite_employee','resend_invitation'].includes(input.action))return failure('EMAIL_DELIVERY_DISABLED','Письма отключены. Доступ настраивает владелец планировщика.',409);
    const admin=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
    const parameters={p_team_id:input.team_id,p_actor_id:identity.user.id,p_action:input.action,p_payload:input.payload||{},p_expected_version:input.expected_version??null,p_operation_id:input.operation_id||null};
    const command=async(phase='begin',outcome={})=>{

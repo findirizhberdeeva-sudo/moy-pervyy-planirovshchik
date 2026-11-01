@@ -6,5 +6,6 @@ Deno.serve(createTeamAdminHandler({
  publicKey:Deno.env.get('SUPABASE_ANON_KEY'),
  serviceKey:Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
  appUrl:Deno.env.get('RITM_APP_URL'),
+ emailDeliveryEnabled:Deno.env.get('RITM_EMAIL_DELIVERY_ENABLED')==='true',
  allowedOrigins:(Deno.env.get('RITM_ALLOWED_ORIGINS')||'').split(',').map(value=>value.trim()).filter(Boolean)
 }));

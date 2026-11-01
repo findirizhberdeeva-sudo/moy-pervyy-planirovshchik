@@ -91,12 +91,13 @@ export async function installService(page,db,{emailDeliveryEnabled=true}={}) {
     if(url.pathname.includes('/rest/v1/rpc/')) {
       const name=url.pathname.split('/').at(-1);
       state.rpcRequests.push({name,body});
+      if(name==='get_weekly_progress'&&state.failedWeekly)return route.abort('failed');
       if(name==='update_profile' && state.failedProfile) return route.abort('failed');
       const ordered={update_profile:['p_team_id','p_display_name','p_expected_version','p_operation_id'],
         get_planner:['p_team_id','p_selected_date','p_filters','p_cursor'],mutate_task:['p_team_id','p_action','p_task_id','p_payload','p_expected_version','p_operation_id'],
         get_report:['p_team_id','p_period_type','p_period_start','p_employee_id','p_direction'],get_report_rows:['p_snapshot_id','p_metric_key','p_cursor','p_limit','p_scope'],get_export_data:['p_snapshot_id'],
         get_task_detail:['p_team_id','p_task_id'],get_task_history:['p_team_id','p_task_id','p_cursor'],list_task_collection:['p_team_id','p_collection','p_employee_id','p_direction','p_cursor'],
-        sync_workspace:['p_team_id'],list_comments:['p_team_id','p_task_id','p_cursor','p_latest'],mutate_comment:['p_team_id','p_action','p_task_id','p_comment_id','p_body','p_expected_version','p_operation_id'],
+        get_weekly_progress:['p_team_id'],claim_daily_support:['p_team_id','p_notification_id'],sync_workspace:['p_team_id'],list_comments:['p_team_id','p_task_id','p_cursor','p_latest'],mutate_comment:['p_team_id','p_action','p_task_id','p_comment_id','p_body','p_expected_version','p_operation_id'],
         get_notifications:['p_team_id','p_unread_only','p_cursor'],read_notifications:['p_team_id','p_ids','p_before','p_operation_id'],
         preview_series:['p_team_id','p_series_id','p_boundary'],mutate_series:['p_team_id','p_action','p_series_id','p_boundary','p_payload','p_expected_version','p_operation_id']};
       const args=(ordered[name]||[]).map(k=>body[k]??null);

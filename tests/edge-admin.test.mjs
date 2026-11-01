@@ -25,6 +25,14 @@ test('Edge email failure stays failed with no false success or leaked SMTP diagn
  const fixture=adminFixture(db,()=>ids.manager,{mailFailure:true});const response=await fixture.handler(request({action:'invite_employee',payload:{email:'edge@example.test',display_name:'Не доставлено'},operation_id:randomUUID()}));
  const result=await response.json();assert.equal(result.data.entity.state,'failed');assert.ok(!JSON.stringify(result).includes('secret SMTP'));
 });
+
+test('no-email mode rejects invitation and resend before privileged work but keeps team administration',async()=>{
+ const fixture=adminFixture(db,token=>ids[token]||null,{emailDeliveryEnabled:false});
+ for(const action of ['invite_employee','resend_invitation']){fixture.state.calls=[];const response=await fixture.handler(request({action,payload:{email:'never@example.test',display_name:'Не отправлять'},operation_id:randomUUID()}));assert.equal(response.status,409);assert.equal((await response.json()).error.code,'EMAIL_DELIVERY_DISABLED');assert.deepEqual(fixture.state.calls,['verify','role']);}
+ assert.equal(fixture.state.mails.length,0);assert.equal((await db.query('select count(*) as n from private.invitations')).rows[0].n,0);
+ assert.equal((await fixture.handler(request({action:'list_team_admin'}))).status,200);
+ assert.equal((await fixture.handler(request({action:'invite_employee',payload:{},operation_id:randomUUID()},undefined,'employee1'))).status,403);
+});
 test('Edge failed Auth ban is retryable after membership is already closed',async()=>{
  const fixture=adminFixture(db,()=>ids.manager,{authBanFailure:true});const member=(await db.query('select version from public.team_members where user_id=$1',[ids.employee1])).rows[0];
  const body={action:'disable_employee',payload:{user_id:ids.employee1},expected_version:member.version,operation_id:randomUUID()};

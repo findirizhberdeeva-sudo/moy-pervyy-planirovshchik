@@ -17,3 +17,9 @@ test('release rejects missing parameters, service keys, insecure URLs and an uns
  const serviceJwt=['header',Buffer.from(JSON.stringify({role:'service_role'})).toString('base64url'),'signature'].join('.');assert.throws(()=>publicConfig({...env,RITM_SUPABASE_PUBLISHABLE_KEY:serviceJwt}));
  const directory=await mkdtemp(resolve('.cache','release-guard-'));await writeFile(resolve(directory,'.env'),'DO_NOT_PUBLISH');await assert.rejects(buildRelease({env,directory}),/посторонние файлы/);assert.equal(await readFile(resolve(directory,'.env'),'utf8'),'DO_NOT_PUBLISH');
 });
+
+test('email delivery is off by default and release accepts only an explicit boolean mode',async()=>{
+ assert.equal(publicConfig(env).emailDeliveryEnabled,false);assert.equal(publicConfig({...env,RITM_EMAIL_DELIVERY_ENABLED:'true'}).emailDeliveryEnabled,true);
+ assert.throws(()=>publicConfig({...env,RITM_EMAIL_DELIVERY_ENABLED:'yes'}),/true или false/);
+ for(const mode of ['false','true']){const directory=await mkdtemp(resolve('.cache','release-mail-mode-'));await buildRelease({env:{...env,RITM_EMAIL_DELIVERY_ENABLED:mode},directory});const js=await readFile(resolve(directory,'app.js'),'utf8');assert.ok(js.includes('emailDeliveryEnabled: '+mode));}
+});

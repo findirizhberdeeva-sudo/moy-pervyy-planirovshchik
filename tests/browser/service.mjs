@@ -7,15 +7,15 @@ import {installFonts} from './fonts.mjs';
 const sdk=await readFile(new URL('../../node_modules/@supabase/supabase-js/dist/umd/supabase.js',import.meta.url),'utf8');
 const pptxBundle=await readFile(new URL('../../node_modules/pptxgenjs/dist/pptxgen.bundle.js',import.meta.url),'utf8');
 const app=await readFile(new URL('../../app.js',import.meta.url),'utf8');
-const configuredBase=app.replace("supabaseUrl: ''","supabaseUrl: 'https://ritm-test.supabase.co'").replace("publishableKey: ''","publishableKey: 'sb_publishable_ritm_automated_tests_only'");
+const configuredBase=app.replace("supabaseUrl: ''","supabaseUrl: 'https://ritm-test.supabase.co'").replace("publishableKey: ''","publishableKey: 'sb_publishable_ritm_automated_tests_only'").replace('emailDeliveryEnabled: false','emailDeliveryEnabled: true');
 // Optional test-only phase timings. No test hooks or logging are added to the released app.
 const configured=process.env.RITM_EXPORT_PROFILE==='1'?configuredBase.replace('  Bootstrap.start();\n})();',()=>`  for(const key of ['library','layout','tablePages','package','pptx','download']){const original=ReportExport[key];ReportExport[key]=function(...args){const start=performance.now(),result=original.apply(this,args),done=()=>console.log('RITM_PROFILE',key,Math.round(performance.now()-start));if(result?.then)return result.finally(done);done();return result;};}\n  Bootstrap.start();\n})();`):configuredBase;
 const realtimeHubs=new WeakMap();
-export async function installService(page,db) {
+export async function installService(page,db,{emailDeliveryEnabled=true}={}) {
   await installFonts(page);
   if(process.env.RITM_EXPORT_PROFILE==='1')page.on('console',message=>{if(message.text().startsWith('RITM_PROFILE'))console.log(message.text());});
   const state={passwords:Object.fromEntries(Object.keys(ids).map(key=>[key,'Test password 123!'])),failedLogin:false,failedProfile:false,expired:false,
-    recoveryRequests:[],passwordUpdates:[],loginRequests:[],failedTask:false,dropTaskResponse:false,taskRequests:[],failedComment:false,dropCommentResponse:false,admin:{},rpcRequests:[],detailGates:{},failedPptx:false};
+    recoveryRequests:[],passwordUpdates:[],loginRequests:[],failedTask:false,dropTaskResponse:false,taskRequests:[],failedComment:false,dropCommentResponse:false,admin:{emailDeliveryEnabled,mails:[]},rpcRequests:[],detailGates:{},failedPptx:false};
   await page.route('https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js',route=>state.failedPptx?route.abort('failed'):route.fulfill({status:200,contentType:'text/javascript',body:pptxBundle}));
   let hub=realtimeHubs.get(db);if(!hub){hub=new Set();realtimeHubs.set(db,hub);}
   state.socketMessages=[];state.muteRealtime=false;
@@ -45,7 +45,7 @@ export async function installService(page,db) {
     const jwt=[{alg:'HS256',typ:'JWT'},{sub:ids[key],aud:'authenticated',role:'authenticated',exp:expiry,iat:expiry-3600},'test-signature'].map(value=>Buffer.from(typeof value==='string'?value:JSON.stringify(value)).toString('base64url')).join('.');
     return {access_token:jwt,token_type:'bearer',expires_in:3600,expires_at:expiry,refresh_token:`test-refresh:${key}`,user:user(key)};
   };
-  await page.route('**/app.js',route=>route.fulfill({contentType:'text/javascript',body:configured}));
+  await page.route('**/app.js',route=>route.fulfill({contentType:'text/javascript',body:configured.replace('emailDeliveryEnabled: true',`emailDeliveryEnabled: ${emailDeliveryEnabled}`)}));
   await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js',route=>route.fulfill({contentType:'text/javascript',body:sdk}));
   await page.route('https://ritm-test.supabase.co/**',async route=>{
     const req=route.request(),url=new URL(req.url());

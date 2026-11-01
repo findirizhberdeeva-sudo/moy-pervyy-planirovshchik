@@ -15,7 +15,9 @@ export function publicConfig(env){
  if(/^sb_publishable_[A-Za-z0-9_-]{10,}$/.test(publishableKey))anonymous=true;
  else if(/^[\w-]+\.[\w-]+\.[\w-]+$/.test(publishableKey)){try{anonymous=JSON.parse(Buffer.from(publishableKey.split('.')[1],'base64url')).role==='anon';}catch{}}
  if(!anonymous)throw new Error('Допустим только публичный publishable / anon ключ. Административный ключ запрещён.');
- return {supabaseUrl:supabaseUrl.replace(/\/$/,''),publishableKey,appBaseUrl};
+ const emailMode=env.RITM_EMAIL_DELIVERY_ENABLED?.trim()||'false';
+ if(!['true','false'].includes(emailMode))throw new Error('RITM_EMAIL_DELIVERY_ENABLED должен быть true или false.');
+ return {supabaseUrl:supabaseUrl.replace(/\/$/,''),publishableKey,appBaseUrl,emailDeliveryEnabled:emailMode==='true'};
 }
 export async function buildRelease({env=process.env,directory=resolve(root,'dist')}={}){
  const config=publicConfig(env);await mkdir(directory,{recursive:true});
@@ -23,7 +25,7 @@ export async function buildRelease({env=process.env,directory=resolve(root,'dist
  const existing=await readdir(directory);if(existing.some(name=>!publicFiles.includes(name)))throw new Error('В папке сборки есть посторонние файлы. Выберите отдельную пустую папку; публикация остановлена.');
  const hashes={};
  for(const name of publicFiles){let content=await readFile(resolve(root,name),'utf8');
-  if(name==='app.js')for(const [key,value] of Object.entries(config)){const anchor=`${key}: ''`;if(content.split(anchor).length!==2)throw new Error(`Не найден единственный параметр ${key}.`);content=content.replace(anchor,`${key}: ${JSON.stringify(value)}`);}
+  if(name==='app.js')for(const [key,value] of Object.entries(config)){const anchor=key==='emailDeliveryEnabled'?'emailDeliveryEnabled: false':`${key}: ''`;if(content.split(anchor).length!==2)throw new Error(`Не найден единственный параметр ${key}.`);content=content.replace(anchor,`${key}: ${JSON.stringify(value)}`);}
   if(/sb_secret_|BEGIN (?:RSA |EC )?PRIVATE KEY|SUPABASE_SERVICE_ROLE_KEY\s*[:=]/.test(content))throw new Error('В публичных файлах обнаружен служебный секрет.');
   await writeFile(resolve(directory,name),content);hashes[name]=createHash('sha256').update(content).digest('hex');
  }

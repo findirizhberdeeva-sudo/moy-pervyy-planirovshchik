@@ -1,0 +1,42 @@
+# Local Supabase configuration. Managed projects require the same settings in Auth.
+project_id = "ritm"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000/"
+additional_redirect_urls = ["http://127.0.0.1:3000/", "http://localhost:3000/"]
+jwt_expiry = 3600
+enable_signup = false
+enable_anonymous_sign_ins = false
+enable_refresh_token_rotation = true
+minimum_password_length = 12
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "60s"
+otp_expiry = 86400
+
+[auth.rate_limit]
+email_sent = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+
+[auth.email.template.recovery]
+subject = "Восстановление доступа — Ритм"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "Приглашение в команду — Ритм"
+content_path = "./supabase/templates/invite.html"
+
+# SMTP credentials are intentionally absent. Use a managed SMTP provider;
+# never commit its password. The production Site URL must include the repo path.
+
+[functions.team-admin]
+# JWT is verified with Auth.getUser() in the handler before the service client exists.
+# This also works with projects using asymmetric JWT signing keys.
+verify_jwt = false

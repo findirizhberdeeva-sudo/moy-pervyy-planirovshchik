@@ -38,19 +38,18 @@ test('clipboard fallback selects complete text and successful copy uses same sna
  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.copiedReport=value;}}}));await page.getByRole('button',{name:'Скопировать сводку',exact:true}).click();await expect(page.locator('#report-dialog')).toContainText('Сводка скопирована');expect(await page.evaluate(()=>window.copiedReport)).toContain('Выполнено фактически: 3');
 });
 test('expired snapshot asks refresh; offline retry preserves selected period and direction',async({page,context})=>{
+ // Saturday to Sunday expires the snapshot without introducing a different workday's popup.
+ // The legitimate Friday result is displayed and acknowledged by ready(); workday rollover is tested separately.
+ await clock(db,'2026-11-07T09:00:00+03:00');
  await ready(page);await open(page);await page.locator('#report-direction').selectOption('uk');
  await expect(page.locator('.report-snapshot')).toContainText('УК');
- await clock(db,'2026-11-03T09:00:00+03:00');
+ await clock(db,'2026-11-08T10:00:00+03:00');
  await page.getByRole('button',{name:'Скачать отчёт',exact:true}).click();
  await page.getByRole('button',{name:'Скачать PNG',exact:true}).click();
  await expect(page.locator('#report-dialog')).toContainText('Обновите отчёт перед скачиванием');
  await page.getByRole('button',{name:'Обновить отчёт',exact:true}).click();
  await expect(page.locator('#report-dialog')).toHaveCount(0);await expect(page.locator('.report-kpis')).toBeVisible();
- // The day changed: acknowledge yesterday's legitimate result before testing an unrelated offline retry.
- // Cutting the network first races the popup against the report button on different operating systems.
- await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
- await expect(page.locator('.daily-support')).toBeVisible();
- await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
+ await expect(page.locator('.daily-support')).toHaveCount(0);
  await context.setOffline(true);await page.getByRole('button',{name:'Обновить итоги',exact:true}).click();
  await expect(page.getByRole('button',{name:'Повторить',exact:true})).toBeVisible();
  await context.setOffline(false);await page.getByRole('button',{name:'Повторить',exact:true}).click();

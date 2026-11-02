@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 export const ids = Object.freeze({manager:'10000000-0000-4000-8000-000000000001',employee1:'10000000-0000-4000-8000-000000000002',employee2:'10000000-0000-4000-8000-000000000003',outsider:'10000000-0000-4000-8000-000000000004'});
-export async function createDatabase(dataDir) {
+export async function createDatabase(dataDir,{beforeMigration}={}) {
   const db = new PGlite(dataDir);
   await db.exec(`create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
     create schema auth;
@@ -9,7 +9,7 @@ export async function createDatabase(dataDir) {
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     grant usage on schema auth to authenticated,anon;
     grant execute on function auth.uid() to authenticated,anon;`);
-  for (const file of (await readdir(new URL('../../supabase/migrations/',import.meta.url))).filter(f=>f.endsWith('.sql')).sort()) {
+  for (const file of (await readdir(new URL('../../supabase/migrations/',import.meta.url))).filter(f=>f.endsWith('.sql')&&(!beforeMigration||f<beforeMigration)).sort()) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${file}`,import.meta.url),'utf8'));
   }
   return db;

@@ -483,7 +483,7 @@
       if(!dialog.open){dialog.showModal();document.getElementById('daily-support-close')?.focus({preventScroll:true});}
       clearTimeout(Daily.confettiTimer);if(Daily.celebrationUntil>Date.now())Daily.confettiTimer=setTimeout(()=>document.querySelector('.support-confetti')?.remove(),Daily.celebrationUntil-Date.now());
     },
-    dismiss(){const target=Daily.returnFocus;Daily.banner=null;Daily.celebrationUntil=0;clearTimeout(Daily.confettiTimer);plannerRender(false);(document.getElementById(target)||document.getElementById('quick-title'))?.focus({preventScroll:true});},
+    dismiss(){const target=Daily.returnFocus;document.getElementById('daily-support-dialog')?.close();Daily.banner=null;Daily.celebrationUntil=0;clearTimeout(Daily.confettiTimer);plannerRender(false);(document.getElementById(target)||document.getElementById('quick-title'))?.focus({preventScroll:true});},
     renderBanner(){const b=Daily.banner;if(!b)return '';const p=b.payload,elapsed=Math.min(3000,Math.max(0,Date.now()-Daily.animationSince));
       const confetti=p.category==='complete'&&Daily.celebrationUntil>Date.now()&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
       const pieces=confetti?'<div class="support-confetti" aria-hidden="true">'+Array.from({length:28},(_,i)=>'<i style="--x:'+((i*37)%100)+'%;--r:'+((i*47)%360)+'deg;--drift:'+((i%2?1:-1)*(10+i*3))+'px;--duration:'+(1.7+i%7*.15)+'s;--tone:'+['#126a31','#dc3377','#c66610','#7550bf'][i%4]+';animation-delay:calc('+(i%5*.08)+'s - '+elapsed+'ms)"></i>').join('')+'</div>':'';
@@ -852,7 +852,7 @@
   root.addEventListener('change',event=>{
     const el=event.target;if(el.hasAttribute('data-report-date')){if(el.value){R.date=R.type==='month'?el.value+'-01':el.value;Reports.load();}return;}if(el.dataset.reportFilter){P.filters[el.dataset.reportFilter]=el.dataset.reportFilter==='employee_id'?el.value||null:el.value;Planner.save();R.filtersChanged=true;Reports.load();return;}if(el.dataset.filter){P.filters[el.dataset.filter]=el.dataset.filter==='employee_id'?el.value||null:el.value;Planner.save();Planner.load();}
     if(el.dataset.filterMulti){const key=el.dataset.filterMulti;P.filters[key]=el.checked?[...new Set([...P.filters[key],el.value])]:P.filters[key].filter(v=>v!==el.value);Planner.save();Planner.load();}
-    if(el.dataset.taskField&&el.type==='date')plannerRender();
+    if(el.dataset.taskField&&el.getAttribute('type')==='date'){if(P.form)P.form[el.dataset.taskField]=el.value;plannerRender();}
     if(el.dataset.taskField&&['frequency','month_day'].includes(el.dataset.taskField))plannerRender();
     if(el.dataset.weekday&&P.form){const day=Number(el.dataset.weekday);P.form.weekdays=el.checked?[...new Set([...P.form.weekdays,day])]:P.form.weekdays.filter(d=>d!==day);}
     if(el.dataset.taskStatus&&P.modal?.task)Planner.mutate('status',P.modal.task,{status:el.value});

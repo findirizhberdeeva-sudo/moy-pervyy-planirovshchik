@@ -28,7 +28,7 @@ test('full form creates task with direction/priority/deadline/description and pr
 test('manager assigns a task to filtered employee and both independent sessions see stored changes',async({page,browser})=>{
  await installService(page,db);await ready(page,'manager');await page.locator('#planner-employee').selectOption(ids.employee2);
  await quick(page,'Задача сотруднику');
- const secondContext=await browser.newContext({baseURL:'http://127.0.0.1:3000'}),second=await secondContext.newPage();
+ const secondContext=await browser.newContext({baseURL:new URL(page.url()).origin}),second=await secondContext.newPage();
  try{await installService(second,db);await ready(second,'employee2');await expect(cards(second)).toContainText('Задача сотруднику');
  await cards(second).getByRole('button',{name:'Задача сотруднику',exact:true}).click();await page.waitForTimeout(20);
  await second.getByLabel('Изменить статус',{exact:false}).selectOption('in_progress');await expect(second.locator('#task-dialog')).toHaveCount(0);

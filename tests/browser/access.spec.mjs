@@ -3,10 +3,11 @@ import {randomUUID} from 'node:crypto';
 import {createDatabase,seedDatabase,ids} from '../helpers/database.mjs';
 import {installService,login} from './service.mjs';
 import {installFonts} from './fonts.mjs';
+import {installClock,clock} from '../helpers/step3.mjs';
 let db,team;
-test.beforeAll(async()=>{db=await createDatabase();});
+test.beforeAll(async()=>{db=await createDatabase();await installClock(db);});
 test.afterAll(async()=>{await db.close();});
-test.beforeEach(async()=>{team=await seedDatabase(db);});
+test.beforeEach(async()=>{team=await seedDatabase(db);await clock(db);});
 test('unconfigured page is honest, has no working login and does not load external SDK',async({page})=>{
   await installFonts(page);
   const outbound=[];page.on('request',request=>{if(request.url().startsWith('https:')) outbound.push(request.url());});
@@ -75,7 +76,7 @@ test('unknown recovery email has the same confirmation, with a safe repository r
   await page.getByRole('button',{name:'Забыли пароль?'}).click();
   await page.getByLabel('Электронная почта',{exact:true}).fill('unknown@example.test');await page.getByRole('button',{name:'Отправить ссылку'}).click();
   await expect(page.getByText('Если эта почта подключена к команде, на неё придёт ссылка для восстановления доступа.')).toBeVisible();
-  expect(decodeURIComponent(service.recoveryRequests[0].url)).toContain('redirect_to=http://127.0.0.1:3000/ritm/');
+  expect(new URL(service.recoveryRequests[0].url).searchParams.get('redirect_to')).toBe(new URL('/ritm/',page.url()).href);
   await page.getByRole('button',{name:'Вернуться ко входу'}).click();await expect(page.getByRole('heading',{name:'Добро пожаловать',exact:true})).toBeVisible();
 });
 test('recovery link opens password form, strips secret URL and updates password before opening workspace',async({page})=>{
@@ -106,7 +107,7 @@ test('invitation password setup activates only the existing employee invitation'
 test('outsider and disabled employee cannot open a workspace',async({page})=>{
   await installService(page,db);await login(page,'outsider');
   await expect(page.getByRole('heading',{name:'Не удалось открыть пространство'})).toBeVisible();
-  await page.getByRole('button',{name:'Вернуться ко входу'}).click();await login(page);
+  await page.getByRole('button',{name:'Вернуться ко входу'}).click();await expect(page.getByRole('button',{name:'Войти в Ритм',exact:true})).toBeVisible();await login(page);
   await expect(page.getByRole('heading',{name:/Здравствуйте/})).toBeVisible();
   await db.query(`update public.team_members set state='disabled',disabled_at=now() where user_id=$1`,[ids.employee1]);
   await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));

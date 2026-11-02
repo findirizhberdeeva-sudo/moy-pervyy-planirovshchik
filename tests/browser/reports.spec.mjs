@@ -38,7 +38,24 @@ test('clipboard fallback selects complete text and successful copy uses same sna
  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.copiedReport=value;}}}));await page.getByRole('button',{name:'Скопировать сводку',exact:true}).click();await expect(page.locator('#report-dialog')).toContainText('Сводка скопирована');expect(await page.evaluate(()=>window.copiedReport)).toContain('Выполнено фактически: 3');
 });
 test('expired snapshot asks refresh; offline retry preserves selected period and direction',async({page,context})=>{
- await ready(page);await open(page);await page.locator('#report-direction').selectOption('uk');await expect(page.locator('.report-snapshot')).toContainText('УК');await clock(db,'2026-11-03T09:00:00+03:00');await page.getByRole('button',{name:'Скачать отчёт',exact:true}).click();await page.getByRole('button',{name:'Скачать PNG',exact:true}).click();await expect(page.locator('#report-dialog')).toContainText('Обновите отчёт перед скачиванием');await page.getByRole('button',{name:'Обновить отчёт',exact:true}).click();await expect(page.locator('#report-dialog')).toHaveCount(0);await expect(page.locator('.report-kpis')).toBeVisible();await context.setOffline(true);await page.getByRole('button',{name:'Обновить итоги',exact:true}).click();await expect(page.getByRole('button',{name:'Повторить',exact:true})).toBeVisible();await context.setOffline(false);await expect(page.locator('.daily-support')).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();await page.getByRole('button',{name:'Повторить',exact:true}).click();await expect(page.locator('.report-kpis')).toBeVisible();await expect(page.locator('#report-direction')).toHaveValue('uk');
+ await ready(page);await open(page);await page.locator('#report-direction').selectOption('uk');
+ await expect(page.locator('.report-snapshot')).toContainText('УК');
+ await clock(db,'2026-11-03T09:00:00+03:00');
+ await page.getByRole('button',{name:'Скачать отчёт',exact:true}).click();
+ await page.getByRole('button',{name:'Скачать PNG',exact:true}).click();
+ await expect(page.locator('#report-dialog')).toContainText('Обновите отчёт перед скачиванием');
+ await page.getByRole('button',{name:'Обновить отчёт',exact:true}).click();
+ await expect(page.locator('#report-dialog')).toHaveCount(0);await expect(page.locator('.report-kpis')).toBeVisible();
+ // The day changed: acknowledge yesterday's legitimate result before testing an unrelated offline retry.
+ // Cutting the network first races the popup against the report button on different operating systems.
+ await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+ await expect(page.locator('.daily-support')).toBeVisible();
+ await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
+ await context.setOffline(true);await page.getByRole('button',{name:'Обновить итоги',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Повторить',exact:true})).toBeVisible();
+ await context.setOffline(false);await page.getByRole('button',{name:'Повторить',exact:true}).click();
+ await expect(page.locator('.report-kpis')).toBeVisible();await expect(page.locator('#report-direction')).toHaveValue('uk');
+ await expect(page.locator('.daily-support')).toHaveCount(0);
 });
 test('pagination and long names export all tasks over multiple slides, header repetition and object bounds',async({page})=>{
  const titles=[];for(let i=0;i<24;i++){if(i%15===0)await db.exec('truncate private.rate_limit_counters');const title=`Завершённая задача ${String(i).padStart(2,'0')} · `+'ОченьДлинноеНазваниеБезПробелов'.repeat(5);let t=await task({title});titles.push(title);const r=await rpc(db,ids.employee1,'mutate_task',[team,'status',t.id,{status:'done'},t.version,randomUUID()]);expect(r.ok).toBe(true);}await db.exec('truncate private.rate_limit_counters');await ready(page);await open(page);const start=Date.now();const file=await download(page,'PPTX');expect(Date.now()-start).toBeLessThan(10000);const zip=await JSZip.loadAsync(await readFile(await file.path()));const slides=await Promise.all(Object.keys(zip.files).filter(k=>/^ppt\/slides\/slide\d+\.xml$/.test(k)).map(k=>zip.file(k).async('string')));expect(slides.length).toBeGreaterThan(6);const plain=slides.join('').replace(/<[^>]+>/g,'');for(let i=0;i<24;i++)expect(plain).toContain(`Завершённая задача ${String(i).padStart(2,'0')}`);for(const xml of slides.filter(x=>x.includes('Выполненные за период задачи'))){expect(xml).toContain('Название');expect((xml.match(/<a:tbl>/g)||[]).length).toBeLessThanOrEqual(11);}await file.saveAs('.cache/step4-long-report.pptx');

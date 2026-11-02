@@ -10,7 +10,7 @@ const report=(type='month',date='2026-11-01',user='manager',employee=null,direct
 async function getReport(...args){const r=await report(...args);assert.equal(r.ok,true,JSON.stringify(r));return r.data;}
 async function create(payload={}){const r=await rpc(db,ids.manager,'mutate_task',[team,'create',null,{title:'Отчётная задача',assignee_id:ids.employee1,...payload},null,randomUUID()]);assert.equal(r.ok,true,JSON.stringify(r));return r.data.entity;}
 async function change(t,action,payload={}){t=(await rpc(db,ids.manager,'get_task_detail',[team,t.id])).data.task;const r=await rpc(db,ids.manager,'mutate_task',[team,action,t.id,payload,t.version,randomUUID()]);assert.equal(r.ok,true,JSON.stringify(r));return r.data.entity;}
-test('TZ JSON fixture executes real RPC: October 40%, November 75%, exact task sets and all counts',async()=>{
+test('TZ JSON fixture executes real RPC: October 50%, November 75%, exact task sets and all counts',async()=>{
  const map=await runReportFixture(db,team);
  for(const expected of reportFixture.expected){const r=await getReport(expected.period_type,expected.period_start);
   for(const [key,value] of Object.entries(expected.metrics))assert.equal(r.metrics[key],value,`${expected.period_start} ${key}`);

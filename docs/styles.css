@@ -191,7 +191,14 @@ select:disabled{background:#f0f2e9;color:#647184}
 .task-menu:hover{background:var(--accent-soft)}
 .task-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:9px 0 0 42px}
 .status-pill{padding:4px 7px;border-radius:5px;background:#f0f1e8;color:#63704a}
-.status-in_progress{background:#ecf0df;color:#596a3e}.status-waiting{background:#f7f2ec;color:#795d40}.status-done{background:#eef5f1;color:var(--green)}
+.status-pill[class*="status-"]{display:inline-flex;font-size:inherit;font-weight:600;line-height:1.45;padding:4px 9px}
+.task-details .task-status-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start}
+.status-planned{background:#e4f1ff;color:#24517a}
+.status-in_progress{background:#fff1a8;color:#665000}
+.status-waiting{background:#ffd6a0;color:#743b00}
+.status-overdue{background:#ffd6dc;color:#941c32}
+.status-done{background:#d6efcf;color:#235c2f}
+.status-cancelled{background:#e6e8eb;color:#505762}
 .task-tags{display:flex;gap:7px 12px;align-items:center;flex-wrap:wrap;font-size:12px;line-height:1.6;color:var(--muted);margin:8px 0 0 42px}
 .task-tags:empty{display:none}
 .priority-important_urgent{color:#8a494d}.priority-important_not_urgent{color:#637044}.priority-not_important_urgent{color:#806348}

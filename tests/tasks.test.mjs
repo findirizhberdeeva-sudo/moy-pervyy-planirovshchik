@@ -98,11 +98,11 @@ test('status/search/priority filters affect cards but not progress; direction an
  const scoped=await planner('2026-11-02',{direction:'sto'});assert.equal(scoped.data.progress.day.progress_percent,100);
  const others=await planner('2026-11-02',{employee_id:ids.employee2});assert.equal(others.data.progress.day.progress_percent,null);
 });
-test('future reschedule withdraws old future placement; same-day reschedule preserves day plan',async()=>{
+test('reschedule changes result date without removing calendar history of same-day work',async()=>{
  let future=await create({plan_start:'2026-11-03'});future=(await mutation('employee1','move',future,{plan_start:'2026-11-05'})).data.entity;
  assert.equal((await planner('2026-11-03')).data.progress.day.planned_count,0);
  let current=await create();await clock('2026-11-02T10:00:00+03:00');await mutation('employee1','move',current,{plan_start:'2026-11-04'});
- const after=await planner();assert.equal(after.data.progress.day.planned_count,1);assert.equal(after.data.day_tasks.length,0);
+ const after=await planner();assert.equal(after.data.progress.day.planned_count,0);assert.equal(after.data.day_tasks.length,0);
 });
 test('closed day progress/status stay unchanged after later completion, cancellation and reassignment',async()=>{
  let t=await create({deadline:'2026-11-02'});await clock('2026-11-03T10:00:00+03:00');t=(await rpc(db,ids.employee1,'get_task_detail',[team,t.id])).data.task;

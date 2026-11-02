@@ -74,7 +74,8 @@ test('only-this exception survives materialization; next revision replaces futur
 test('schedule revisions supersede disappearing future dates without user cancellations and can restore same IDs',async()=>{
  let s=await newSeries({end_date:'2026-11-08'});const id=(await rows(s)).find(t=>t.occurrence_date==='2026-11-03').id;
  let r=await series('update',s,{frequency:'weekly',weekdays:[1]},'2026-11-03');assert.equal(r.ok,true,JSON.stringify(r));s=r.data.entity;
- assert.equal((await rows(s)).find(t=>t.id===id).is_superseded,true);assert.equal((await rpc(db,ids.employee1,'get_planner',[team,'2026-11-03',{},null])).data.progress.day.planned_count,0);
+ assert.equal((await rows(s)).find(t=>t.id===id).is_superseded,true);assert.equal((await rpc(db,ids.employee1,'get_planner',[team,'2026-11-03',{},null])).data.progress.day.planned_count,1);
+ assert.equal((await db.query("select count(*)::int n from private.result_states($1,date '2026-11-03',date '2026-11-04',private.task_now()) where task_id=$2",[team,id])).rows[0].n,0);
  r=await series('update',s,{frequency:'daily'},'2026-11-03');assert.equal(r.ok,true,JSON.stringify(r));assert.equal((await rows(s)).find(t=>t.id===id).is_superseded,false);
 });
 test('stopping removes only future instances and supports stop before first occurrence',async()=>{

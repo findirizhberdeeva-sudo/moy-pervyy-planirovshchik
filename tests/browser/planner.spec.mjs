@@ -114,10 +114,10 @@ test('overdue collection includes a task planned outside the current month',asyn
  await create({title:'Давний срок',plan_start:'2026-12-01',deadline:'2026-10-31'});await installService(page,db);await ready(page);
  await page.getByRole('button',{name:'Все просроченные: 1',exact:true}).click();await expect(page.locator('#task-dialog')).toContainText('Давний срок');
 });
-test('past navigation cannot backdate new task; Today returns to server date',async({page})=>{
+test('past navigation cannot backdate new task; date picker returns to server day',async({page})=>{
  await installService(page,db);await ready(page);await page.locator('.month-day[data-date="2026-11-01"]').click();await expect(page.locator('.quick-hint')).toContainText('создание на сегодня');
  await page.getByLabel('Название быстрой задачи').fill('Сегодняшняя');await page.getByRole('button',{name:'Добавить быструю задачу',exact:true}).click();await expect(page.locator('.notice-success')).toBeVisible();
- await page.getByRole('button',{name:'Сегодня',exact:true}).click();await expect(cards(page)).toContainText('Сегодняшняя');expect((await db.query('select plan_start::text from public.tasks')).rows[0].plan_start).toBe('2026-11-02');
+ await page.getByLabel('Выбрать дату',{exact:true}).fill('2026-11-02');await page.getByLabel('Выбрать дату',{exact:true}).press('Tab');await expect(cards(page)).toContainText('Сегодняшняя');expect((await db.query('select plan_start::text from public.tasks')).rows[0].plan_start).toBe('2026-11-02');
 });
 test('calendar and modal fit all target widths; screenshots contain only test data',async({page})=>{
  await create({title:'Подготовить управленческий отчёт',direction:'sto',important:true,urgent:true,deadline:'2026-11-02'});await create({title:'Согласовать бюджет на ноябрь',direction:'uk',deadline:'2026-11-06'});await create({title:'Проверить данные по прокату',direction:'rental',plan_start:'2026-11-04'});await create({title:'Обновить план работы команды',direction:'dbk',plan_end:'2026-11-06'});

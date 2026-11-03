@@ -91,6 +91,8 @@ export async function installService(page,db,{emailDeliveryEnabled=true}={}) {
     if(url.pathname.includes('/rest/v1/rpc/')) {
       const name=url.pathname.split('/').at(-1);
       state.rpcRequests.push({name,body});
+      if(name==='get_planner'&&state.plannerGate)await state.plannerGate;
+      if(name==='get_planner'&&state.failedPlanner)return route.abort('failed');
       if(name==='get_weekly_progress'&&state.failedWeekly)return route.abort('failed');
       if(name==='update_profile' && state.failedProfile) return route.abort('failed');
       const ordered={update_profile:['p_team_id','p_display_name','p_expected_version','p_operation_id'],

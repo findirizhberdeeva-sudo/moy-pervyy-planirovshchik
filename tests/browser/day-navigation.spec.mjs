@@ -35,7 +35,7 @@ test('date picker synchronizes day week month and progress while preserving filt
 });
 
 test('five working day arrows stop at boundaries and skip Friday to Monday',async({page})=>{
- await ready(page);await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeEnabled();await expect(page.locator('#quick-days-hint')).toContainText('3 ноября — 9 ноября');
+ await ready(page);await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeEnabled();await expect(page.locator('#quick-days-hint')).toContainText('3 ноября — 9 ноября');await expect(page.locator('#quick-days-hint')).toContainText('Если дата вне быстрого диапазона — выберите дату вверху.');
  for(const date of ['2026-11-04','2026-11-05','2026-11-06','2026-11-09']){await next(page).click();await selected(page,date);}
  await expect(next(page)).toBeDisabled();await expect(page.locator('.week-range')).toHaveText('9 ноября — 15 ноября');await expect(picker(page)).toBeFocused();
  for(const date of ['2026-11-06','2026-11-05','2026-11-04','2026-11-03']){await previous(page).click();await selected(page,date);}

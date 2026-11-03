@@ -129,11 +129,19 @@ dialog p { color:var(--muted); line-height:1.6; margin:0 0 24px; }
 .planner-greeting .workspace-lead{margin:0;font-size:16px}
 .planner-greeting .card-kicker{font-size:13px;margin-bottom:10px}
 .planner-toolbar{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:22px}
-.period-nav{display:flex;align-items:center;gap:10px}
+.period-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .period-nav h2{margin:0;min-width:185px;text-transform:capitalize;font-size:24px;font-weight:550;letter-spacing:-.5px}
 .icon-button{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:white;font-size:25px;color:var(--accent-dark);padding:3px 10px}
 .icon-button:hover{background:var(--accent-soft)}
-.today-button{margin-left:8px;min-height:44px}
+.planner-date-picker{display:grid;gap:5px;margin-left:8px;max-width:100%}
+.planner-date-picker label{font-size:14px;color:var(--muted)}
+.planner-date-picker input{font:inherit;min-height:44px;width:174px;min-width:0;max-width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);color-scheme:light}
+.planner-date-picker input:disabled{background:#f0f2e9;color:var(--muted)}
+.planner-date-error{font-size:14px;line-height:1.45;color:var(--red);max-width:240px}
+.planner-date-error:empty{display:none}
+.day-heading-row{flex-wrap:wrap;gap:12px}
+.day-navigation{display:flex;align-items:center;gap:8px;margin-left:auto}
+.quick-days-hint{font-size:14px;line-height:1.5;color:var(--muted);margin:0 0 18px;overflow-wrap:anywhere}
 .main-filters{display:flex;gap:14px;align-items:center}
 .main-filters label{display:grid;gap:6px;min-width:175px}
 .main-filters label>span{color:var(--muted);font-size:13px}
@@ -251,7 +259,7 @@ select:disabled{background:#f0f2e9;color:#647184}
 @media(max-width:1023px){.planning-grid{grid-template-columns:1fr}.week-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}.week-day{border:1px solid var(--line)}.main-filters{justify-content:flex-start}.planner-workspace{padding-top:26px}.planner-greeting .button{font-size:14px}.progress-card{padding:16px}}
 @media(max-width:767px){
  .planner-workspace{padding:25px 16px 90px}.planner-greeting{align-items:flex-start}.planner-greeting h1{font-size:29px;letter-spacing:-.6px}.planner-greeting>.button{position:fixed;bottom:max(16px,env(safe-area-inset-bottom));right:16px;z-index:7;box-shadow:0 6px 25px #30372924;padding:13px 17px}
- .period-nav{width:100%;gap:6px}.period-nav h2{font-size:22px;min-width:0;flex:1}.period-nav .icon-button{min-width:36px}.today-button{padding:10px;font-size:14px;margin-left:0}
+ .period-nav{width:100%;gap:6px;display:grid;grid-template-columns:44px minmax(0,1fr) 44px}.period-nav h2{font-size:22px;min-width:0;text-align:center}.period-nav .icon-button{min-width:44px}.planner-date-picker{grid-column:1/-1;margin:8px 0 0}.planner-date-picker input{width:100%}.planner-date-error{max-width:none}
  .main-filters{width:100%;gap:10px}.main-filters label{flex:1;min-width:0}.main-filters select{font-size:14px;width:100%}
  .progress-grid{gap:8px}.progress-card{padding:12px 10px;border-radius:10px}.progress-card strong{font-size:23px}.progress-card>div:first-child{display:grid;justify-items:start;font-size:14px;gap:8px}.progress-card>div:first-child>span{padding:5px 6px}.progress-card p{font-size:12px;line-height:1.6}.progress-track{margin-top:12px}.progress-hint{font-size:12px;margin-bottom:15px}
  .secondary-filters{gap:8px}.secondary-filters>input{width:100%;font-size:16px}.secondary-filters>select,.filter-popover{flex:1;min-width:110px}.filter-popover>div{max-width:calc(100vw - 50px);width:235px}.filter-popover:nth-of-type(2)>div{left:auto;right:0}

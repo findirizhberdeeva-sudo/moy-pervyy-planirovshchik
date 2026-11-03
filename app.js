@@ -257,14 +257,14 @@
         setMessage(error.message);if(render)plannerRender();
       }
     },
-    async date(date){
+    async date(date,focusId=null){
       const picker=document.getElementById('planner-selected-date');
-      if(State.busy||P.loading||P.targetDate){if(picker)picker.value=P.targetDate||P.date;return;}
+      if(State.busy||P.targetDate){if(picker)picker.value=P.targetDate||P.date;return;}
       P.dateError=Calendar.valid(date)?'':'Выберите корректную дату с 01.01.2000 по 31.12.2100.';
       if(picker)picker.setAttribute('aria-invalid',String(!!P.dateError));
       const error=document.getElementById('planner-date-error');if(error)error.textContent=P.dateError;
       if(P.dateError||date===P.date)return;
-      const focus=document.activeElement?.id;P.dateFocusId=['planner-selected-date','planner-day-prev','planner-day-next'].includes(focus)?focus:null;
+      const focus=focusId||document.activeElement?.id;P.dateFocusId=['planner-selected-date','planner-day-prev','planner-day-next'].includes(focus)?focus:null;
       P.targetDate=date;plannerRender();await Planner.load();
     },
     render(){
@@ -395,7 +395,7 @@
       if(State.busy&&!['close'].includes(a))return;
       if(a==='create')return Planner.openCreate();if(a==='detail')return Planner.open(id);
       if(a==='date')return Planner.date(button.dataset.date);
-      if(a==='day-prev'||a==='day-next'){const days=Calendar.workdays(P.data.today),index=days.indexOf(P.date),date=index<0?null:days[index+(a==='day-prev'?-1:1)];if(date)return Planner.date(date);return;}
+      if(a==='day-prev'||a==='day-next'){const days=Calendar.workdays(P.data.today),index=days.indexOf(P.date),date=index<0?null:days[index+(a==='day-prev'?-1:1)];if(date)return Planner.date(date,button.id);return;}
       if(a.startsWith('month-'))return Planner.date(Calendar.month(P.date,a.endsWith('prev')?-1:1));
       if(a.startsWith('week-'))return Planner.date(Calendar.add(P.date,a.endsWith('prev')?-7:7));
       if(a==='refresh')return Planner.load();if(a==='more')return Planner.load({append:true});
@@ -879,7 +879,7 @@
     else if(action==='retry-profile' && State.profileConflict) {Object.assign(State.context.member,State.profileConflict); State.profileVersion=State.profileConflict.version; State.profileConflict=null; State.pendingProfile=null; submitForm('profile');}
   });
   root.addEventListener('change',event=>{
-    const el=event.target;if(el.id==='planner-selected-date'){Planner.date(el.value);return;}if(el.hasAttribute('data-report-date')){if(el.value){R.date=R.type==='month'?el.value+'-01':el.value;Reports.load();}return;}if(el.dataset.reportFilter){P.filters[el.dataset.reportFilter]=el.dataset.reportFilter==='employee_id'?el.value||null:el.value;Planner.save();R.filtersChanged=true;Reports.load();return;}if(el.dataset.filter){P.filters[el.dataset.filter]=el.dataset.filter==='employee_id'?el.value||null:el.value;Planner.save();Planner.load();}
+    const el=event.target;if(el.id==='planner-selected-date'){Planner.date(el.value,el.id);return;}if(el.hasAttribute('data-report-date')){if(el.value){R.date=R.type==='month'?el.value+'-01':el.value;Reports.load();}return;}if(el.dataset.reportFilter){P.filters[el.dataset.reportFilter]=el.dataset.reportFilter==='employee_id'?el.value||null:el.value;Planner.save();R.filtersChanged=true;Reports.load();return;}if(el.dataset.filter){P.filters[el.dataset.filter]=el.dataset.filter==='employee_id'?el.value||null:el.value;Planner.save();Planner.load();}
     if(el.dataset.filterMulti){const key=el.dataset.filterMulti;P.filters[key]=el.checked?[...new Set([...P.filters[key],el.value])]:P.filters[key].filter(v=>v!==el.value);Planner.save();Planner.load();}
     if(el.dataset.taskField&&el.getAttribute('type')==='date'){if(P.form)P.form[el.dataset.taskField]=el.value;if(!refreshTaskDateHints())plannerRender();}
     if(el.dataset.taskField&&['frequency','month_day'].includes(el.dataset.taskField))plannerRender();

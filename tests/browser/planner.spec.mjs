@@ -58,7 +58,10 @@ test('drag and drop uses actual server move and respects calendar target',async(
  await page.setViewportSize({width:1440,height:2200});
  await installService(page,db);await ready(page);await quick(page,'Передвинуть');
  await expect(cards(page).first()).toHaveAttribute('draggable','true');
- await cards(page).first().dragTo(page.locator('.month-day[data-date="2026-11-04"]'),{sourcePosition:{x:8,y:8}});
+ await expect(page.getByRole('button',{name:'Добавить быструю задачу',exact:true})).toBeEnabled();
+ await cards(page).first().hover({position:{x:8,y:8}});await page.mouse.down();
+ const target=page.locator('.month-day[data-date="2026-11-04"]');
+ await target.hover();await target.hover();await page.mouse.up();
  await expect.poll(async()=>(await db.query('select plan_start::text from public.tasks')).rows[0].plan_start).toBe('2026-11-04');
  await expect(cards(page)).toHaveCount(0);await page.locator('.month-day[data-date="2026-11-04"]').click();await expect(cards(page)).toContainText('Передвинуть');
 });

@@ -27,11 +27,14 @@ test('failed invitation is visible, resend is throttled and cancellation is a re
  await page.getByRole('button',{name:'Отменить приглашение',exact:true}).click();await expect(page.locator('.invitation-card')).toContainText('Отменено');expect((await db.query('select state from private.invitations')).rows[0].state).toBe('cancelled');
 });
 test('disable modal transfers tasks and closes existing employee session on access recheck',async({page,browser})=>{
- const t=await task();await ready(page,'manager');const context=await browser.newContext();try{const employee=await context.newPage();await ready(employee);await expect(cards(employee)).toContainText(t.title);
+ const t=await task();await ready(page,'manager');const context=await browser.newContext();try{const employee=await context.newPage();const employeeService=await ready(employee);await expect(cards(employee)).toContainText(t.title);
+  await employee.getByLabel('Выбрать дату',{exact:true}).focus();await employee.getByLabel('Выбрать дату',{exact:true}).fill('');
   await page.getByRole('button',{name:'Команда',exact:true}).click();const member=page.locator('.member-card').filter({has:page.getByRole('heading',{name:'Сотрудник 1',exact:true})});await member.getByRole('button',{name:'Отключить',exact:true}).click();
   await expect(page.locator('#task-dialog')).toContainText('Активных задач: 1');await page.getByLabel('Новый исполнитель',{exact:true}).selectOption(ids.employee2);await page.getByRole('button',{name:'Отключить и передать',exact:true}).click();await expect(page.locator('#task-dialog')).toHaveCount(0);
   expect((await db.query('select assignee_id from public.tasks where id=$1',[t.id])).rows[0].assignee_id).toBe(ids.employee2);
-  await employee.bringToFront();await expect.poll(()=>employee.evaluate(()=>document.visibilityState)).toBe('visible');await employee.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(employee.locator('#quick-title')).toHaveCount(0);await expect(employee.getByText('Не удалось открыть пространство',{exact:true})).toBeVisible();
+  const beforeRecheck=employeeService.rpcRequests.length;await employee.bringToFront();await expect.poll(()=>employee.evaluate(()=>document.visibilityState)).toBe('visible');await employee.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
+  try{await expect(employee.locator('#quick-title')).toHaveCount(0);await expect(employee.getByText('Не удалось открыть пространство',{exact:true})).toBeVisible();}
+  catch(error){console.log('ACCESS_RECHECK_DIAGNOSTICS',JSON.stringify({requests:employeeService.rpcRequests.slice(beforeRecheck).map(r=>r.name),ui:await employee.evaluate(()=>({hidden:document.hidden,visibility:document.visibilityState,busy:document.getElementById('app')?.getAttribute('aria-busy'),active:document.activeElement?.id,date:document.getElementById('planner-selected-date')?.value,network:document.getElementById('network-banner')?.textContent}))}));throw error;}
   await member.getByRole('button',{name:'Включить снова',exact:true}).click();await expect(member).toContainText('Активен');expect((await db.query('select assignee_id from public.tasks where id=$1',[t.id])).rows[0].assignee_id).toBe(ids.employee2);
  }finally{await context.close();}
 });

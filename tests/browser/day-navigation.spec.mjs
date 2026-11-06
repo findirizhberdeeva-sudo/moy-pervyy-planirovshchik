@@ -97,3 +97,12 @@ test('online date rollover queues another refresh when a previous snapshot is st
  service.plannerResponseGate=null;release();await expect(page.locator('#quick-days-hint')).toContainText('4 ноября — 10 ноября');
  await expect(page.locator('.day-panel')).toHaveAttribute('data-drop-date','2026-11-06');
 });
+
+test('background refresh preserves a date being typed until it is committed by leaving the field',async({page})=>{
+ const service=await ready(page);
+ const marker=await rpc(db,ids.manager,'mutate_task',[team,'create',null,{title:'Маркер фонового обновления',plan_start:'2026-11-03',plan_end:'2026-11-06',deadline:'2026-11-06',assignee_id:ids.employee1},null,randomUUID()]);expect(marker.ok).toBe(true);
+ let release;service.plannerResponseGate=new Promise(resolve=>release=resolve);
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>service.plannerResponseWaiting).toBe(true);
+ await picker(page).focus();await picker(page).fill('2026-11-06');const refreshed=page.waitForResponse(r=>r.url().endsWith('/rpc/get_notifications'));service.plannerResponseGate=null;release();await (await refreshed).finished();
+ await expect(picker(page)).toHaveValue('2026-11-06');await picker(page).press('Tab');await selected(page,'2026-11-06');await expect(page.locator('.day-tasks')).toContainText('Маркер фонового обновления');
+});

@@ -229,9 +229,11 @@
     flushSoon(){RenderInteraction.settling=true;clearTimeout(RenderInteraction.timer);RenderInteraction.timer=setTimeout(()=>{if(RenderInteraction.pointers.size||RenderInteraction.dragging)return;RenderInteraction.settling=false;const focus=RenderInteraction.pending;RenderInteraction.pending=null;if(focus!==null)plannerRender(focus);},0);}
   };
   function plannerRender(focus=true){
-    if(RenderInteraction.pointers.size||RenderInteraction.dragging||RenderInteraction.settling){RenderInteraction.pending=focus;return;}
+    const active=document.activeElement;
+    const editingDate=active?.id==='planner-selected-date'&&!P.targetDate&&active.value!==P.date;
+    if(RenderInteraction.pointers.size||RenderInteraction.dragging||RenderInteraction.settling||editingDate){RenderInteraction.pending=focus;return;}
     RenderInteraction.pending=null;
-    const active=document.activeElement, id=active?.id, start=active?.selectionStart,end=active?.selectionEnd;
+    const id=active?.id, start=active?.selectionStart,end=active?.selectionEnd;
     Views.render();
     // Restore before returning control: a delayed callback could steal the next field's focus.
     if(focus && id && !Daily.banner && !Object.keys(P.errors).length){const el=document.getElementById(id);if(el){el.focus({preventScroll:true});if(el.setSelectionRange && typeof start==='number' && !['date','email','number'].includes(el.type))try{el.setSelectionRange(start,end);}catch{}}}
@@ -856,6 +858,7 @@
   document.addEventListener('pointerdown',event=>RenderInteraction.hold(event),true);
   document.addEventListener('pointerup',event=>RenderInteraction.release(event),true);
   document.addEventListener('pointercancel',event=>RenderInteraction.release(event),true);
+  root.addEventListener('focusout',event=>{if(event.target.id==='planner-selected-date'&&RenderInteraction.pending!==null)RenderInteraction.flushSoon();});
   root.addEventListener('dragstart',()=>{RenderInteraction.dragging=true;},true);
   document.addEventListener('dragend',()=>{RenderInteraction.dragging=false;RenderInteraction.pointers.clear();RenderInteraction.flushSoon();},true);
   document.addEventListener('drop',()=>{RenderInteraction.dragging=false;RenderInteraction.pointers.clear();RenderInteraction.flushSoon();},true);

@@ -88,3 +88,12 @@ test('Moscow date rollover refreshes five day window without moving a separately
  await expect(page.locator('#quick-days-hint')).toContainText('4 ноября — 10 ноября');await expect(page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true})).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
  await selected(page,'2026-11-06');await next(page).click();await selected(page,'2026-11-09');
 });
+
+test('online date rollover queues another refresh when a previous snapshot is still in flight',async({page})=>{
+ const service=await ready(page);await choose(page,'2026-11-06');
+ let release;service.plannerResponseGate=new Promise(resolve=>release=resolve);
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>service.plannerResponseWaiting).toBe(true);
+ await clock(db,'2026-11-04T00:01:00+03:00');await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ service.plannerResponseGate=null;release();await expect(page.locator('#quick-days-hint')).toContainText('4 ноября — 10 ноября');
+ await expect(page.locator('.day-panel')).toHaveAttribute('data-drop-date','2026-11-06');
+});

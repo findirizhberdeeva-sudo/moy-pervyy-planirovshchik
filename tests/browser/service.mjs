@@ -105,7 +105,7 @@ export async function installService(page,db,{emailDeliveryEnabled=true}={}) {
       const args=(ordered[name]||[]).map(k=>body[k]??null);
       if(name==='mutate_task'){state.taskRequests.push(body);if(state.failedTask)return route.abort('failed');}
       if(name==='mutate_comment'&&state.failedComment)return route.abort('failed');
-      try {const result=await rpc(db,ids[key],name,args);if(name==='get_notifications'&&state.notificationsGate)await state.notificationsGate;if(name==='get_task_detail'&&state.detailGates[body.p_task_id])await state.detailGates[body.p_task_id];await state.emitRealtime();if(name==='mutate_task'&&state.dropTaskResponse){state.dropTaskResponse=false;return route.abort('failed');}if(name==='mutate_comment'&&state.dropCommentResponse){state.dropCommentResponse=false;return route.abort('failed');}return reply(result);}
+      try {const result=await rpc(db,ids[key],name,args);if(name==='get_planner'&&state.plannerResponseGate){state.plannerResponseWaiting=true;await state.plannerResponseGate;state.plannerResponseWaiting=false;}if(name==='get_notifications'&&state.notificationsGate)await state.notificationsGate;if(name==='get_task_detail'&&state.detailGates[body.p_task_id])await state.detailGates[body.p_task_id];await state.emitRealtime();if(name==='mutate_task'&&state.dropTaskResponse){state.dropTaskResponse=false;return route.abort('failed');}if(name==='mutate_comment'&&state.dropCommentResponse){state.dropCommentResponse=false;return route.abort('failed');}return reply(result);}
       catch(error) {console.error('TEST RPC',name,error.message);return reply({code:'XX000',message:'Test service error'},500);}
     }
     return reply({message:'Unknown test endpoint'},404);

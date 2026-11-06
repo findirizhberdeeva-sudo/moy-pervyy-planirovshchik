@@ -32,11 +32,12 @@ test('future month materialization includes earlier long starts and never auto-m
  await rpc(db,ids.employee1,'get_planner',[team,'2027-02-01',{},null]);const all=await rows(s);assert.ok(all.some(t=>t.occurrence_date==='2027-01-30'));
  assert.ok(all.every(t=>t.plan_start===t.occurrence_date));assert.equal((await db.query(`select count(*) as n from private.task_events where event_type='auto_move'`)).rows[0].n,0);
 });
-test('Friday/waiting/long task auto-continue Monday once, retaining ID/status/deadline',async()=>{
+test('Friday/waiting/long task with deadline auto-continues each calendar day, retaining ID/status/deadline',async()=>{
  await clock(db,'2026-10-30T10:00:00+03:00');let r=await rpc(db,ids.employee1,'mutate_task',[team,'create',null,{title:'Ожидание',deadline:'2026-10-30'},null,randomUUID()]);let t=r.data.entity;
  t=(await rpc(db,ids.employee1,'mutate_task',[team,'status',t.id,{status:'waiting'},t.version,randomUUID()])).data.entity;
- await clock(db,'2026-10-31T00:00:00+03:00');r=await sync();assert.equal(r.data.moved_task_count,1);const moved=await detail(t.id);assert.equal(moved.plan_start,'2026-11-02');assert.equal(moved.status,'waiting');assert.equal(moved.deadline,'2026-10-30');
- await clock(db,'2026-11-01T00:00:00+03:00');await sync();assert.equal((await detail(t.id)).version,moved.version);
+ await clock(db,'2026-10-31T00:00:00+03:00');r=await sync();assert.equal(r.data.moved_task_count,1);const moved=await detail(t.id);assert.equal(moved.plan_start,'2026-10-31');assert.equal(moved.status,'waiting');assert.equal(moved.deadline,'2026-10-30');
+ await sync();assert.equal((await detail(t.id)).version,moved.version);
+ await clock(db,'2026-11-01T00:00:00+03:00');await sync();assert.equal((await detail(t.id)).plan_start,'2026-11-01');
  await clock(db,'2026-11-02T00:00:00+03:00');await sync();assert.equal((await detail(t.id)).id,t.id);
 });
 test('a manually planned Saturday stays until Sunday then continues Monday',async()=>{

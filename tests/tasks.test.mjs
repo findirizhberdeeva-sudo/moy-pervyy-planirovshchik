@@ -80,11 +80,11 @@ test('assigned task cannot be cancelled/deleted by employee; cancellation reason
  t=(await mutation('employee1','status',t,{status:'cancelled',reason:'План изменился'})).data.entity;
  const p=await planner();assert.equal(p.data.progress.day.planned_count,1);assert.equal(p.data.progress.day.cancelled_count,1);
 });
-test('completion/undo and reopening cancelled task use real server time and next working day',async()=>{
+test('completion/undo and reopening cancelled task use real server time and calendar continuation for a deadline',async()=>{
  let t=await create({deadline:'2026-11-02'});t=(await mutation('employee1','status',t,{status:'done'})).data.entity;
  assert.equal(t.completed_by,ids.employee1);assert.ok(t.completed_at);assert.equal(t.late,false);
  await clock('2026-11-07T09:00:00+03:00');t=(await mutation('employee1','status',t,{status:'in_progress'})).data.entity;
- assert.equal(t.plan_start,'2026-11-09');assert.equal(t.deadline,'2026-11-02');assert.equal(t.completed_at,null);
+ assert.equal(t.plan_start,'2026-11-07');assert.equal(t.deadline,'2026-11-02');assert.equal(t.completed_at,null);
 });
 test('long task is visible every day but counted once in week/month',async()=>{
  await create({plan_end:'2026-11-06'});

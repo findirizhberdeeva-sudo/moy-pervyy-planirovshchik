@@ -139,8 +139,10 @@
   const submit = (text,busyText) => `<button class="button button-primary button-full" type="submit" ${State.busy || !configValid()?'disabled':''}>${State.busy?busyText:text}</button>`;
   const Views = {
     render() {
+      captureNativeDrafts();
       root.setAttribute('aria-busy',String(State.busy));
       root.innerHTML=State.context && !State.flow?Views.workspace():Views.auth();
+      bindNativeDrafts();
       const heading=root.querySelector('main h1,main h2');
       document.title=State.context && State.view==='profile'?'Профиль — Ритм':'Ритм — командный планировщик';
       if(State.connectionLost || !navigator.onLine) Views.network();
@@ -221,17 +223,21 @@
   };
   const P={date:null,data:null,filters:null,loading:false,sequence:0,quick:'',modal:null,form:null,errors:{},pending:null,undo:null,
     history:[],historyCursor:null,tab:'detail',collection:null,collectionCursor:null,detailsOpen:{},focusModal:false,searchTimer:null,loadingModal:false,targetDate:null,dateFocusId:null,dateError:''};
-  // Snapshot native text before replacing the DOM, even if its input event is pending.
+  // Snapshot changed native text before replacing the DOM, even after focus moved.
   // Owner/revision guards keep an intentional reload or reset from reviving old text.
   const NativeDrafts=new WeakMap();
   function captureNativeDraft(el=document.activeElement){
-    if(!el?.isConnected)return;const binding=NativeDrafts.get(el);if(!binding)return;
+    if(!el?.isConnected)return;const binding=NativeDrafts.get(el);if(!binding||el.value===binding.value)return;
     if(binding.form&&binding.form===P.form)P.form[binding.field]=el.value;
     else if(binding.comment&&binding.revision===Comments.draftRevision&&binding.task===P.modal?.task?.id)Comments.draft=el.value;
+    binding.value=el.value;
+  }
+  function captureNativeDrafts(){
+    root.querySelectorAll('textarea[data-task-field],input[type="text"][data-task-field],#comment-draft').forEach(el=>captureNativeDraft(el));
   }
   function bindNativeDrafts(){
-    if(P.form)root.querySelectorAll('textarea[data-task-field],input[type="text"][data-task-field]').forEach(el=>NativeDrafts.set(el,{form:P.form,field:el.dataset.taskField}));
-    const comment=document.getElementById('comment-draft');if(comment)NativeDrafts.set(comment,{comment:true,revision:Comments.draftRevision,task:P.modal?.task?.id});
+    if(P.form)root.querySelectorAll('textarea[data-task-field],input[type="text"][data-task-field]').forEach(el=>NativeDrafts.set(el,{form:P.form,field:el.dataset.taskField,value:el.value}));
+    const comment=document.getElementById('comment-draft');if(comment)NativeDrafts.set(comment,{comment:true,revision:Comments.draftRevision,task:P.modal?.task?.id,value:comment.value});
   }
   // Keep the pressed node alive through pointerup/click. Access revocation still
   // renders immediately through Views.render; only ordinary planner redraws wait.
@@ -241,14 +247,13 @@
     flushSoon(){RenderInteraction.settling=true;clearTimeout(RenderInteraction.timer);RenderInteraction.timer=setTimeout(()=>{if(RenderInteraction.pointers.size||RenderInteraction.dragging)return;RenderInteraction.settling=false;const focus=RenderInteraction.pending;RenderInteraction.pending=null;if(focus!==null)plannerRender(focus);},0);}
   };
   function plannerRender(focus=true){
-    captureNativeDraft();
+    captureNativeDrafts();
     const active=document.activeElement;
     const editingDate=active?.id==='planner-selected-date'&&!P.targetDate&&active.value!==P.date;
     if(RenderInteraction.pointers.size||RenderInteraction.dragging||RenderInteraction.settling||editingDate){RenderInteraction.pending=focus;return;}
     RenderInteraction.pending=null;
     const id=active?.id, start=active?.selectionStart,end=active?.selectionEnd;
     Views.render();
-    bindNativeDrafts();
     // Restore before returning control: a delayed callback could steal the next field's focus.
     if(focus && id && !Daily.banner && !Object.keys(P.errors).length){const el=document.getElementById(id);if(el){el.focus({preventScroll:true});if(el.setSelectionRange && typeof start==='number' && !['date','email','number'].includes(el.type))try{el.setSelectionRange(start,end);}catch{}}}
   }
@@ -357,7 +362,7 @@
     afterRender(){
       if(P.dateFocusId&&!P.targetDate&&!P.modal&&!Daily.banner){const control=document.getElementById(P.dateFocusId);P.dateFocusId=null;(control&&!control.disabled?control:document.getElementById('planner-selected-date'))?.focus({preventScroll:true});}
       const dialog=document.getElementById('task-dialog');if(dialog&&!dialog.open){dialog.showModal();if(P.focusModal){P.focusModal=false;requestAnimationFrame(()=>{(dialog.querySelector('[aria-invalid="true"]')||dialog.querySelector('#task-title')||dialog.querySelector('#task-plan_start')||dialog.querySelector('button'))?.focus();});}}},
-    hasDirty(){captureNativeDraft();return !!P.modal&&(['create','edit','move','cancel','series-edit','series-stop','team-disable'].includes(P.modal.mode)&&JSON.stringify(P.form)!==P.modal.baseline||Comments.dirty());},
+    hasDirty(){captureNativeDrafts();return !!P.modal&&(['create','edit','move','cancel','series-edit','series-stop','team-disable'].includes(P.modal.mode)&&JSON.stringify(P.form)!==P.modal.baseline||Comments.dirty());},
     close(force=false){if(State.busy)return;if(!force&&Planner.hasDirty())return navigate(()=>Planner.close(true));P.pending=null;delete Work.pending.series;P.modal=null;P.form=null;P.errors={};P.tab='detail';P.history=[];Comments.clear();plannerRender(false);},
     openCreate(){if(!P.data||P.targetDate)return;const owner=State.context.member.role==='manager'&&P.data.members.some(m=>m.user_id===P.filters.employee_id&&m.state==='active')?P.filters.employee_id:State.context.user.id;
       const day=P.date<P.data.today?P.data.today:P.date;P.form={title:P.quick,description:'',plan_start:day,plan_end:day,deadline:'',direction:P.filters.direction==='all'?'none':P.filters.direction,priority:'unset',assignee_id:owner,frequency:'none',weekdays:[new Date(day+'T12:00:00Z').getUTCDay()||7],month_day:Number(day.slice(8)),repeat_end:''};P.modal={mode:'create',baseline:JSON.stringify(P.form)};P.errors={};P.focusModal=true;plannerRender(false);},
@@ -877,7 +882,7 @@
   document.addEventListener('dragend',()=>{RenderInteraction.dragging=false;RenderInteraction.pointers.clear();RenderInteraction.flushSoon();},true);
   document.addEventListener('drop',()=>{RenderInteraction.dragging=false;RenderInteraction.pointers.clear();RenderInteraction.flushSoon();},true);
   window.addEventListener('blur',()=>{RenderInteraction.dragging=false;RenderInteraction.pointers.clear();RenderInteraction.flushSoon();});
-  root.addEventListener('submit',event=>{const form=event.target.closest('[data-form]'); if(form) {captureNativeDraft();event.preventDefault();const name=form.dataset.form;if(name==='work-comment')return Comments.save();if(name==='work-invite')return Team.invite();if(name==='work-disable')return Team.disable();if(name==='work-series')return Series.save();name.startsWith('planner-')?Planner.submit(name):submitForm(name);}});
+  root.addEventListener('submit',event=>{const form=event.target.closest('[data-form]'); if(form) {captureNativeDrafts();event.preventDefault();const name=form.dataset.form;if(name==='work-comment')return Comments.save();if(name==='work-invite')return Team.invite();if(name==='work-disable')return Team.disable();if(name==='work-series')return Series.save();name.startsWith('planner-')?Planner.submit(name):submitForm(name);}});
   root.addEventListener('click',event=>{
     const button=event.target.closest('[data-action]'); if(!button || button.disabled) return;
     const action=button.dataset.action;

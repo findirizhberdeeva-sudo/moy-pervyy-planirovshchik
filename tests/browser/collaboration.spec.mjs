@@ -115,10 +115,11 @@ test('lost socket messages recover on resubscription and foreground without assu
 });
 test('conflict application sends only edited task fields and preserves a colleague date change',async({page})=>{
  const t=await task();const service=await ready(page);await openTask(page);await page.getByRole('button',{name:'Изменить',exact:true}).click();
- // A redraw can arrive before the native input event is delivered.
- await page.getByLabel('Описание',{exact:true}).focus();await page.getByLabel('Описание',{exact:true}).evaluate(el=>{el.value='Мой текст описания';});
+ // Focus may already have moved when a pending native value change arrives.
+ await page.getByLabel('Описание',{exact:true}).focus();await page.getByLabel('Описание',{exact:true}).evaluate(el=>{el.blur();el.value='Мой текст описания';});await expect(page.getByLabel('Описание',{exact:true})).toHaveValue('Мой текст описания');
  const moved=await rpc(db,ids.manager,'mutate_task',[team,'move',t.id,{plan_start:'2026-11-04'},t.version,randomUUID()]);expect(moved.ok).toBe(true);await service.emitRealtime();
- await expect(page.getByText('Актуальные данные задачи',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Применить мои изменения после проверки',exact:true}).click();await expect(page.locator('#task-dialog')).toHaveCount(0);
+ await expect(page.getByText('Актуальные данные задачи',{exact:true})).toBeVisible();await expect(page.getByLabel('Описание',{exact:true})).toHaveValue('Мой текст описания');await page.getByRole('button',{name:'Применить мои изменения после проверки',exact:true}).click();await expect(page.locator('#task-dialog')).toHaveCount(0);
+ expect(service.taskRequests.at(-1).p_payload).toMatchObject({description:'Мой текст описания'});
  expect((await db.query('select description,plan_start::text from public.tasks where id=$1',[t.id])).rows[0]).toEqual({description:'Мой текст описания',plan_start:'2026-11-04'});
 });
 test('series conflict shows latest rule and reapplies only edited fields',async({page})=>{

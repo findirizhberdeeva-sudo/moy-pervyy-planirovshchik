@@ -60,7 +60,7 @@ test('same-author concurrent comment edit exposes conflict and preserves explici
 test('pending native comment text survives refresh and explicit reload and save reset the composer',async({page})=>{
  const t=await task(),created=await rpc(db,ids.employee1,'mutate_comment',[team,'create',t.id,null,'Исходный комментарий',null,randomUUID()]);expect(created.ok).toBe(true);
  const service=await ready(page);await openTask(page);await comments(page);await page.getByRole('button',{name:'Изменить комментарий',exact:true}).click();await expect(page.locator('.comment-composer label')).toContainText('Изменение комментария');
- await page.locator('#comment-draft').focus();await page.locator('#comment-draft').evaluate(el=>{el.value='Ещё не доставленное событие ввода';});
+ await page.locator('#comment-draft').focus();await page.evaluate(()=>{document.getElementById('comment-draft').value='Ещё не доставленное событие ввода';});
  const row=(await db.query('select id,version from public.comments where task_id=$1',[t.id])).rows[0];const changed=await rpc(db,ids.employee1,'mutate_comment',[team,'update',t.id,row.id,'Текст из другой сессии',row.version,randomUUID()]);expect(changed.ok).toBe(true);await service.emitRealtime();
  await expect(page.getByRole('button',{name:'Загрузить актуальный комментарий',exact:true})).toBeVisible();await expect(page.locator('#comment-draft')).toHaveValue('Ещё не доставленное событие ввода');
  await page.getByRole('button',{name:'Загрузить актуальный комментарий',exact:true}).click();await expect(page.locator('#comment-draft')).toHaveValue('Текст из другой сессии');
@@ -116,7 +116,7 @@ test('lost socket messages recover on resubscription and foreground without assu
 test('conflict application sends only edited task fields and preserves a colleague date change',async({page})=>{
  const t=await task();const service=await ready(page);await openTask(page);await page.getByRole('button',{name:'Изменить',exact:true}).click();
  // Focus may already have moved when a pending native value change arrives.
- await page.getByLabel('Описание',{exact:true}).focus();await page.getByLabel('Описание',{exact:true}).evaluate(el=>{el.blur();el.value='Мой текст описания';});await expect(page.getByLabel('Описание',{exact:true})).toHaveValue('Мой текст описания');
+ await page.getByLabel('Описание',{exact:true}).focus();await page.evaluate(()=>{const el=document.getElementById('task-description');el.blur();el.value='Мой текст описания';});await expect(page.getByLabel('Описание',{exact:true})).toHaveValue('Мой текст описания');
  const moved=await rpc(db,ids.manager,'mutate_task',[team,'move',t.id,{plan_start:'2026-11-04'},t.version,randomUUID()]);expect(moved.ok).toBe(true);await service.emitRealtime();
  await expect(page.getByText('Актуальные данные задачи',{exact:true})).toBeVisible();await expect(page.getByLabel('Описание',{exact:true})).toHaveValue('Мой текст описания');await page.getByRole('button',{name:'Применить мои изменения после проверки',exact:true}).click();await expect(page.locator('#task-dialog')).toHaveCount(0);
  expect(service.taskRequests.at(-1).p_payload).toMatchObject({description:'Мой текст описания'});

@@ -57,6 +57,15 @@ test('same-author concurrent comment edit exposes conflict and preserves explici
   await expect(page.getByRole('button',{name:'Применить мой текст после проверки',exact:true})).toBeVisible();await expect(page.locator('#comment-draft')).toHaveValue('Мой черновик');await page.getByRole('button',{name:'Применить мой текст после проверки',exact:true}).click();await expect(page.locator('.comment-entry')).toContainText('Мой черновик');
  }finally{await context.close();}
 });
+test('pending native comment text survives refresh and explicit reload and save reset the composer',async({page})=>{
+ const t=await task(),created=await rpc(db,ids.employee1,'mutate_comment',[team,'create',t.id,null,'Исходный комментарий',null,randomUUID()]);expect(created.ok).toBe(true);
+ const service=await ready(page);await openTask(page);await comments(page);await page.getByRole('button',{name:'Изменить комментарий',exact:true}).click();await expect(page.locator('.comment-composer label')).toContainText('Изменение комментария');
+ await page.locator('#comment-draft').focus();await page.locator('#comment-draft').evaluate(el=>{el.value='Ещё не доставленное событие ввода';});
+ const row=(await db.query('select id,version from public.comments where task_id=$1',[t.id])).rows[0];const changed=await rpc(db,ids.employee1,'mutate_comment',[team,'update',t.id,row.id,'Текст из другой сессии',row.version,randomUUID()]);expect(changed.ok).toBe(true);await service.emitRealtime();
+ await expect(page.getByRole('button',{name:'Загрузить актуальный комментарий',exact:true})).toBeVisible();await expect(page.locator('#comment-draft')).toHaveValue('Ещё не доставленное событие ввода');
+ await page.getByRole('button',{name:'Загрузить актуальный комментарий',exact:true}).click();await expect(page.locator('#comment-draft')).toHaveValue('Текст из другой сессии');
+ await page.locator('#comment-draft').fill('Сохранённый текст');await page.getByRole('button',{name:'Сохранить комментарий',exact:true}).click();await expect(page.locator('.comment-entry')).toContainText('Сохранённый текст');await expect(page.locator('#comment-draft')).toHaveValue('');
+});
 test('notification opening marks one read across independent sessions; listing marks none',async({page,browser})=>{
  await task({assignee_id:ids.employee1},'manager');await ready(page);const context=await browser.newContext();try{const other=await context.newPage();await ready(other);
   await page.getByRole('button',{name:'Уведомления: 1',exact:true}).click();await expect(page.locator('.notification-item.unread')).toHaveCount(1);expect((await db.query('select read_at from public.notifications')).rows[0].read_at).toBeNull();
@@ -105,7 +114,9 @@ test('lost socket messages recover on resubscription and foreground without assu
  service.muteRealtime=true;await rpc(db,ids.employee1,'mutate_task',[team,'update',t.id,{title:'После возврата'},t.version,randomUUID()]);await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(cards(page)).toContainText('После возврата');
 });
 test('conflict application sends only edited task fields and preserves a colleague date change',async({page})=>{
- const t=await task();const service=await ready(page);await openTask(page);await page.getByRole('button',{name:'Изменить',exact:true}).click();await page.getByLabel('Описание',{exact:true}).fill('Мой текст описания');
+ const t=await task();const service=await ready(page);await openTask(page);await page.getByRole('button',{name:'Изменить',exact:true}).click();
+ // A redraw can arrive before the native input event is delivered.
+ await page.getByLabel('Описание',{exact:true}).focus();await page.getByLabel('Описание',{exact:true}).evaluate(el=>{el.value='Мой текст описания';});
  const moved=await rpc(db,ids.manager,'mutate_task',[team,'move',t.id,{plan_start:'2026-11-04'},t.version,randomUUID()]);expect(moved.ok).toBe(true);await service.emitRealtime();
  await expect(page.getByText('Актуальные данные задачи',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Применить мои изменения после проверки',exact:true}).click();await expect(page.locator('#task-dialog')).toHaveCount(0);
  expect((await db.query('select description,plan_start::text from public.tasks where id=$1',[t.id])).rows[0]).toEqual({description:'Мой текст описания',plan_start:'2026-11-04'});
@@ -125,7 +136,13 @@ test('late task response cannot replace a different modal after the first was cl
  await openTask(page,'Другая задача');release();await page.getByRole('button',{name:/^Комментарии ·/}).click();await expect(page.locator('#task-dialog .detail-title')).toHaveText('Другая задача');await expect(page.locator('#comment-draft')).toBeVisible();
 });
 test('server date change carries Friday deadline task into Saturday and preserves deadline',async({page})=>{
- await clock(db,'2026-11-06T12:00:00+03:00');const t=await task({deadline:'2026-11-06'});await ready(page);await clock(db,'2026-11-07T00:01:00+03:00');await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(page.locator('#day-heading')).toContainText('7 ноября');await expect(page.locator('.daily-support')).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();await expect(cards(page)).toContainText('Общая задача');expect((await db.query('select plan_start::text,deadline::text from public.tasks where id=$1',[t.id])).rows[0]).toEqual({plan_start:'2026-11-07',deadline:'2026-11-06'});await page.locator('.month-day[data-date="2026-11-09"]').click();await expect(cards(page)).toHaveCount(0);
+ await clock(db,'2026-11-06T12:00:00+03:00');
+ // Membership belongs to the fixture's Friday, independent of the host's date.
+ await db.exec("update public.team_members set joined_at='2026-11-06T09:00:00+03:00'");
+ const t=await task({deadline:'2026-11-06'});await ready(page);
+ await expect(page.locator('.daily-day[aria-current="date"]')).toHaveAttribute('aria-label',/^6 ноября:/);
+ await clock(db,'2026-11-07T00:01:00+03:00');await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await expect(page.locator('#day-heading')).toContainText('7 ноября');
+ await expect(page.locator('.daily-support')).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();await expect(cards(page)).toContainText('Общая задача');expect((await db.query('select plan_start::text,deadline::text from public.tasks where id=$1',[t.id])).rows[0]).toEqual({plan_start:'2026-11-07',deadline:'2026-11-06'});await page.locator('.month-day[data-date="2026-11-09"]').click();await expect(cards(page)).toHaveCount(0);
 });
 test('team, comments, notifications and repeat forms fit phone/desktop; screenshots use only fixtures',async({page})=>{
  await series();const service=await ready(page,'manager');await page.getByRole('button',{name:'Команда',exact:true}).click();for(const width of [360,390,768,1440]){await page.setViewportSize({width,height:950});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}

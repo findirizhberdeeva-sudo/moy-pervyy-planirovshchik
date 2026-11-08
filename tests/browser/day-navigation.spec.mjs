@@ -7,8 +7,9 @@ import {installService,login} from './service.mjs';
 
 let db,team;
 const picker=page=>page.getByLabel('Выбрать дату',{exact:true});
-const previous=page=>page.getByRole('button',{name:'Предыдущий рабочий день',exact:true});
-const next=page=>page.getByRole('button',{name:'Следующий рабочий день',exact:true});
+const previous=page=>page.getByRole('button',{name:'Предыдущий день',exact:true});
+const next=page=>page.getByRole('button',{name:'Следующий день',exact:true});
+const navigationHint='Стрелки переключают соседние календарные дни, включая выходные и праздники';
 async function setDay(date){await clock(db,date+'T09:00:00+03:00');await db.exec('update public.team_members set joined_at=private.task_now()');}
 async function task(title,date){const r=await rpc(db,ids.manager,'mutate_task',[team,'create',null,{title,plan_start:date,deadline:date,assignee_id:ids.employee1,direction:'sto'},null,randomUUID()]);expect(r.ok,JSON.stringify(r)).toBe(true);}
 async function ready(page){const service=await installService(page,db);await login(page);await expect(picker(page)).toBeVisible();await expect(page.locator('.daily-member')).toHaveCount(1);return service;}
@@ -34,24 +35,29 @@ test('date picker synchronizes day week month and progress while preserving filt
  expect((await db.query('select jsonb_agg(t order by id) as state from public.tasks t')).rows[0].state).toEqual(before);
 });
 
-test('five working day arrows stop at boundaries and skip Friday to Monday',async({page})=>{
- await ready(page);await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeEnabled();await expect(page.locator('#quick-days-hint')).toContainText('3 ноября — 9 ноября');await expect(page.locator('#quick-days-hint')).toContainText('Если дата вне быстрого диапазона — выберите дату вверху.');
- for(const date of ['2026-11-04','2026-11-05','2026-11-06','2026-11-09']){await next(page).click();await selected(page,date);}
- await expect(next(page)).toBeDisabled();await expect(page.locator('.week-range')).toHaveText('9 ноября — 15 ноября');await expect(picker(page)).toBeFocused();
- for(const date of ['2026-11-06','2026-11-05','2026-11-04','2026-11-03']){await previous(page).click();await selected(page,date);}
- await expect(previous(page)).toBeDisabled();await expect(picker(page)).toBeFocused();
- for(const date of ['2026-11-07','2026-11-10','2026-11-02']){await choose(page,date);await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeDisabled();await expect(page.locator('#quick-days-hint')).toContainText('вне быстрого диапазона');}
+test('calendar arrows include holidays weekends and dates outside the former five day window',async({page})=>{
+ const service=await ready(page);await page.locator('#planner-direction').selectOption('sto');await expect(page.getByLabel('Добавить быструю задачу',{exact:true})).toBeEnabled();await page.getByLabel('Название быстрой задачи').fill('Черновик на любой день');
+ await expect(previous(page)).toBeEnabled();await expect(next(page)).toBeEnabled();await expect(page.locator('#quick-days-hint')).toHaveText(navigationHint);
+ for(const date of ['2026-11-04','2026-11-05','2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-10']){await next(page).click();await selected(page,date);}
+ await expect(page.locator('.week-range')).toHaveText('9 ноября — 15 ноября');await expect(next(page)).toBeFocused();
+ for(const date of ['2026-11-09','2026-11-08','2026-11-07','2026-11-06','2026-11-05','2026-11-04','2026-11-03','2026-11-02']){await previous(page).click();await selected(page,date);}
+ await expect(previous(page)).toBeEnabled();await expect(previous(page)).toBeFocused();
+ await choose(page,'2026-10-15');await next(page).click();await selected(page,'2026-10-16');await previous(page).click();await selected(page,'2026-10-15');
+ await expect(page.locator('#planner-direction')).toHaveValue('sto');await expect(page.getByLabel('Название быстрой задачи')).toHaveValue('Черновик на любой день');expect(service.taskRequests).toHaveLength(0);
 });
 
-for(const today of ['2026-11-07','2026-11-08'])test(`weekend ${today} starts quick window on Monday without hiding weekend plan`,async({page})=>{
- await setDay(today);await ready(page);await selected(page,today);await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeDisabled();await expect(page.locator('#quick-days-hint')).toContainText('9 ноября — 13 ноября');
- await choose(page,'2026-11-09');await expect(previous(page)).toBeDisabled();await next(page).click();await selected(page,'2026-11-10');
+for(const today of ['2026-11-07','2026-11-08'])test(`weekend ${today} opens with both calendar arrows enabled`,async({page})=>{
+ await setDay(today);await ready(page);await selected(page,today);await expect(previous(page)).toBeEnabled();await expect(next(page)).toBeEnabled();await expect(page.locator('#quick-days-hint')).toHaveText(navigationHint);
+ await next(page).click();await selected(page,today==='2026-11-07'?'2026-11-08':'2026-11-09');await previous(page).click();await selected(page,today);
 });
 
-test('working day navigation crosses month and year using weekdays without a holiday calendar',async({page})=>{
+test('calendar navigation crosses month year and leap day and stops only at supported date boundaries',async({page})=>{
  await setDay('2026-12-31');await ready(page);await next(page).click();await selected(page,'2027-01-01');await expect(page.locator('.period-nav h2')).toContainText('январь 2027');
- await next(page).click();await selected(page,'2027-01-04');await expect(page.locator('.week-range')).toHaveText('4 января — 10 января');
- await choose(page,'2000-02-29');await expect(page.locator('#day-heading')).toHaveText('29 февраля');await expect(next(page)).toBeDisabled();
+ await next(page).click();await selected(page,'2027-01-02');await expect(page.locator('.week-range')).toHaveText('28 декабря — 3 января');
+ await choose(page,'2026-11-30');await next(page).click();await selected(page,'2026-12-01');await previous(page).click();await selected(page,'2026-11-30');
+ await choose(page,'2000-02-28');await next(page).click();await selected(page,'2000-02-29');await next(page).click();await selected(page,'2000-03-01');await previous(page).click();await selected(page,'2000-02-29');
+ await choose(page,'2000-01-01');await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeEnabled();await next(page).click();await selected(page,'2000-01-02');await previous(page).click();await selected(page,'2000-01-01');await expect(picker(page)).toBeFocused();
+ await choose(page,'2100-12-31');await expect(next(page)).toBeDisabled();await expect(previous(page)).toBeEnabled();await previous(page).click();await selected(page,'2100-12-30');await next(page).click();await selected(page,'2100-12-31');await expect(picker(page)).toBeFocused();
 });
 
 test('date loading locks navigation and network failure retains previous plan filters and quick draft',async({page})=>{
@@ -62,7 +68,7 @@ test('date loading locks navigation and network failure retains previous plan fi
  await expect(page.getByRole('button',{name:'Добавить быструю задачу',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'＋ Добавить задачу',exact:true})).toBeDisabled();await page.getByLabel('Название быстрой задачи').press('Enter');expect(service.taskRequests).toHaveLength(0);
  service.plannerGate=null;release();await selected(page,'2026-11-04');
  service.failedPlanner=true;await picker(page).fill('2026-11-05');await picker(page).press('Tab');await expect(page.locator('.notice-error')).toBeVisible();await selected(page,'2026-11-04');await expect(page.getByLabel('Название быстрой задачи')).toHaveValue('Черновик перехода');
- service.failedPlanner=false;await next(page).click();await selected(page,'2026-11-05');
+ service.failedPlanner=false;await next(page).click();await selected(page,'2026-11-05');await expect(page.locator('.notice-error')).toHaveCount(0);await expect(page.locator('#network-banner')).toHaveCount(0);
 });
 
 test('foreground day selection supersedes a background refresh and ignores its stale response',async({page})=>{
@@ -70,6 +76,29 @@ test('foreground day selection supersedes a background refresh and ignores its s
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>service.rpcRequests.filter(r=>r.name==='get_planner').length).toBeGreaterThan(before);
  await next(page).click();await expect.poll(()=>service.rpcRequests.some(r=>r.name==='get_planner'&&r.body.p_selected_date==='2026-11-04')).toBe(true);
  service.plannerGate=null;release();await selected(page,'2026-11-04');
+});
+
+test('refresh removes a planner load error while preserving a newer task success notification',async({page})=>{
+ const service=await ready(page);service.failedPlanner=true;
+ await next(page).click();await expect(page.locator('.notice-error')).toBeVisible();await selected(page,'2026-11-03');
+ service.failedPlanner=false;await page.getByRole('button',{name:'Обновить',exact:true}).click();await expect(page.locator('.notice-error')).toHaveCount(0);await selected(page,'2026-11-03');
+ service.failedPlanner=true;await next(page).click();await expect(page.locator('.notice-error')).toBeVisible();await selected(page,'2026-11-03');
+ service.failedPlanner=false;await page.getByLabel('Название быстрой задачи').fill('Новая задача после сбоя');await page.getByRole('button',{name:'Добавить быструю задачу',exact:true}).click();
+ await expect(page.locator('.day-tasks')).toContainText('Новая задача после сбоя');await expect(page.locator('.notice-success')).toContainText('Изменения сохранены.');
+ await page.getByRole('button',{name:'Обновить',exact:true}).click();await selected(page,'2026-11-03');await expect(page.locator('.notice-success')).toContainText('Изменения сохранены.');
+});
+
+test('successful planner retry preserves a newer task error',async({page})=>{
+ const service=await ready(page);service.failedPlanner=true;await next(page).click();await expect(page.locator('.notice-error')).toBeVisible();await selected(page,'2026-11-03');
+ service.failedPlanner=false;service.failedTask=true;await page.getByLabel('Название быстрой задачи').fill('Не потерять после сбоя');await page.getByRole('button',{name:'Добавить быструю задачу',exact:true}).click();await expect(page.locator('.field-error')).toBeVisible();await expect(page.locator('.notice-error')).toBeVisible();await expect(next(page)).toBeEnabled();
+ await next(page).click();await selected(page,'2026-11-04');await expect(page.locator('.notice-error')).toBeVisible();await expect(page.getByLabel('Название быстрой задачи')).toHaveValue('Не потерять после сбоя');
+});
+
+test('calendar arrows stay disabled during saving and recover when saving completes',async({page})=>{
+ const service=await ready(page);await page.getByLabel('Название быстрой задачи').fill('Проверка сохранения');
+ let release;service.plannerGate=new Promise(resolve=>release=resolve);
+ await page.getByRole('button',{name:'Добавить быструю задачу',exact:true}).click();await expect(previous(page)).toBeDisabled();await expect(next(page)).toBeDisabled();await expect(picker(page)).toBeDisabled();
+ service.plannerGate=null;release();await expect(previous(page)).toBeEnabled();await expect(next(page)).toBeEnabled();await expect(picker(page)).toBeEnabled();await expect(page.locator('.day-tasks')).toContainText('Проверка сохранения');
 });
 
 test('empty and out of range dates never load a different plan and keyboard/mobile navigation remains usable',async({page})=>{
@@ -83,10 +112,10 @@ test('empty and out of range dates never load a different plan and keyboard/mobi
  await page.reload();await selected(page,'2026-11-03');
 });
 
-test('Moscow date rollover refreshes five day window without moving a separately selected day',async({page})=>{
+test('Moscow date rollover refreshes today without moving a separately selected day',async({page})=>{
  await ready(page);await choose(page,'2026-11-06');await clock(db,'2026-11-04T00:01:00+03:00');await page.evaluate(()=>window.dispatchEvent(new Event('online')));
- await expect(page.locator('#quick-days-hint')).toContainText('4 ноября — 10 ноября');await expect(page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true})).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
- await selected(page,'2026-11-06');await next(page).click();await selected(page,'2026-11-09');
+ await expect(page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true})).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
+ await selected(page,'2026-11-06');await expect(page.locator('#quick-days-hint')).toHaveText(navigationHint);await next(page).click();await selected(page,'2026-11-07');
 });
 
 test('online date rollover queues another refresh when a previous snapshot is still in flight',async({page})=>{
@@ -94,7 +123,8 @@ test('online date rollover queues another refresh when a previous snapshot is st
  let release;service.plannerResponseGate=new Promise(resolve=>release=resolve);
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));await expect.poll(()=>service.plannerResponseWaiting).toBe(true);
  await clock(db,'2026-11-04T00:01:00+03:00');await page.evaluate(()=>window.dispatchEvent(new Event('online')));
- service.plannerResponseGate=null;release();await expect(page.locator('#quick-days-hint')).toContainText('4 ноября — 10 ноября');
+ const refreshed=page.waitForResponse(async r=>r.url().endsWith('/rpc/get_planner')&&(await r.json()).data?.today==='2026-11-04');service.plannerResponseGate=null;release();await (await refreshed).finished();
+ await expect(page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true})).toBeVisible();await page.getByRole('button',{name:'Закрыть сообщение поддержки',exact:true}).click();
  await expect(page.locator('.day-panel')).toHaveAttribute('data-drop-date','2026-11-06');
 });
 
